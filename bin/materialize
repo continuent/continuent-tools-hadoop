@@ -1,0 +1,35 @@
+#!/bin/bash
+# Copyright (C) 2014 Continuent, Inc.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.  You may obtain
+# a copy of the License at
+# 
+#         http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# Initial developer(s): Robert Hodges
+# Contributor(s): 
+
+# Script to generate and run map/reduce to generate materialized views 
+# from staging tables.  
+
+# Check for ruby.  
+RUBY=`which ruby 2> /dev/null`
+if [ "$RUBY" = "" -o ! -x "$RUBY" ]; then
+  echo "Your system does not appear to have a ruby interpreter installed"
+  echo "Please install ruby and ensure that 'ruby --version' works"
+  exit 1
+fi
+
+# Find home and put it in environment to ensure consistent working directory. 
+thome1="`dirname $0`/.."
+export THOME="`cd $thome1; pwd`"
+
+# Run the script with appropriate includes. 
+$RUBY -I$THOME/ruby -I$THOME/lib/ruby $THOME/ruby/materialize.rb $*

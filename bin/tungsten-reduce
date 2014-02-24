@@ -1,0 +1,172 @@
+#!/usr/bin/perl
+# Copyright (C) 2014 Continuent, Inc.
+# 
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.  You may obtain
+# a copy of the License at
+# 
+#         http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+# License for the specific language governing permissions and limitations
+# under the License.
+#
+# Initial developer(s): Robert Hodges
+# Contributor(s): 
+
+# Script to reduce records distributed by key and sorted by key and commit
+# order by selecting the final record.  This is used to create materialized
+# views that contain only records as of a particular point in time. 
+#
+# This script was inspired by a Python example from Suresh Antony. 
+
+use strict;
+use Getopt::Std;
+
+# Global variables. 
+undef my @currentKey;
+undef my $keyLength;
+undef my @currentRow;
+undef my $KEYS;
+undef my $COLUMNS;
+my %KEY_NAMES;
+my ($VERBOSE, $USAGE) = (0, 0,);
+
+# Log a message. 
+sub printLog {
+  if ($VERBOSE > 0) {
+    my ($msg) = @_;
+    print LOG "$msg\n";
+  }
+}
+
+# Spit out a row if and only if the opcode is not D. 
+sub output {
+  my $last = $#currentRow;
+  if ($currentRow[0] ne "D") {
+    print join("\t", @currentRow[3..$last]) . "\n";
+  }
+}
+
+# Returns 1 if the key argument matches the current key. 
+sub keyMatch {
+  my @key = @_;
+  for (my $i = 0; $i < $keyLength; $i++) {
+    if ($key[$i] ne $currentKey[$i]) {
+      printLog("Key does not match: i=$i new=$key[$i] old=$currentKey[$i]");
+      return 0;
+    }
+    printLog("Key matches: i=$i new=$key[$i] old=$currentKey[$i]");
+  }
+  printLog("Key matches");
+  return 1;
+}
+
+# Process next row. 
+sub processRow {
+  my @row = @_;
+  my @key = ();
+  my $i = 0;
+  foreach my $key_name (keys %KEY_NAMES) {
+    $key[$i++] = @row[$KEY_NAMES{$key_name}];
+  }
+ 
+  if (! defined(@currentKey)) {
+    # This is the first row of the batch, so we store data. 
+    @currentKey = @key;
+    @currentRow = @row;
+  }
+  elsif (keyMatch(@key) == 0) {
+    # The key has changed, so we need to output the last row from the 
+    # previous key. 
+    output();
+    @currentKey = @key;
+    @currentRow = @row;
+  }
+  else
+  {
+    # Key is the same, so we just remember the current row. 
+    @currentRow = @row;
+  }
+}
+
+# Prints usage of script. 
+sub usage() {
+  print "Usage: $0 -k keys -c cols [-v]\n";
+  print "Options:\n";
+  print "  -c cols: Comma-separated list of column names [required]\n";
+  print "  -k keys: Comma-separated list of key columns [required]\n";
+  print "  -v     : Print verbosely for debugging\n";
+  print "  -h     : Print help\n";
+}
+
+########################################################
+# Main script
+########################################################
+
+# Process command line options. 
+my %options = ();
+if (getopts("c:k:vh",\%options)) {
+  $COLUMNS = $options{'c'} if (defined $options{'c'});
+  $KEYS = $options{'k'} if (defined $options{'k'});
+  $VERBOSE = 1 if (defined $options{'v'});
+  $USAGE = 1 if (defined $options{'h'});
+}
+else {
+  usage();
+  exit 1;
+}
+
+# Print usage if desired. 
+if ($USAGE) {
+  usage();
+  exit 0;
+}
+
+# Check for missing arguments. 
+unless (defined $COLUMNS) {
+  print "You must provide columns using the -c option\n";
+  exit 1;
+}
+unless (defined $KEYS) {
+  print "You must provide keys using the -k option\n";
+  exit 1;
+}
+
+# Open the log. 
+if ($VERBOSE > 0) {
+  open LOG, ">/tmp/reduce.$$.out" or die "Unable to open log!!";
+}
+
+# Find keys in the columns. Note that the index starts at 3 because we 
+# we have preceding Tungsten columns. 
+$keyLength = 0;
+foreach my $key (split(',', $KEYS)) {
+  # Find key within the column name list.
+  my $key_col_index = 0;
+  COL: foreach my $col (split(',', $COLUMNS)) {
+    if ($col eq $key) {
+      $KEY_NAMES{$key} = $key_col_index;
+      printLog("Found key in column: name=$key position=$key_col_index");
+      $keyLength++;
+      last COL;
+    }
+    $key_col_index++;
+  }
+  die "Key not found in column list: $key" unless defined $KEY_NAMES{$key};
+}
+
+# Main loop.  Process rows until we get to the very end. 
+while (<STDIN>) {
+  chomp();
+  printLog($_);
+  processRow(split(/\t/));
+}
+output();
+
+# Close the log. 
+if ($VERBOSE > 0) {
+  close LOG;
+}
