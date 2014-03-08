@@ -27,6 +27,16 @@ require 'json'
 require 'fileutils'
 require 'hadoop/table'
 
+# Print a starting header. 
+def print_start_header()
+  puts ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+end
+
+# Print an ending header. 
+def print_end_header()
+  puts "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+end
+
 # Find our home. 
 home = ENV["THOME"]
 
@@ -73,6 +83,8 @@ elseif ! File.readable?(metadata_file)
   exit 1
 end 
 
+verbose = options[:verbose] 
+
 # Load table metadata from file. 
 tables = Table.array_from_metadata_file(metadata_file)
 
@@ -90,10 +102,18 @@ FROM (
 ) map1
 INSERT OVERWRITE TABLE #{tab.fqn}
   SELECT TRANSFORM(
-      tungsten_opcode,tungsten_seqno,tungsten_row_id,#{tab.columns()})
-    USING 'perl tungsten-reduce -k id -c tungsten_opcode,tungsten_seqno,tungsten_row_id,#{tab.columns}'
+      tungsten_opcode,tungsten_seqno,tungsten_row_id,tungsten_commit_timestamp,#{tab.columns()})
+    USING 'perl tungsten-reduce -k #{tab.keys} -c tungsten_opcode,tungsten_seqno,tungsten_row_id,tungsten_commit_timestamp,#{tab.columns}'
     AS #{tab.columns_with_types};
 EOT
+  # Print if we are verbose. 
+  if verbose
+    print_start_header
+    puts "### Map/Reduce Query:"
+    puts sql
+    print_end_header
+  end
+
   # Echo the query to the log. 
   File.open(options[:log], "a") {|f| f.write(sql) }
 

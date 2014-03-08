@@ -27,10 +27,22 @@ require 'optparse'
 require 'fileutils'
 require 'hadoop/table'
 
+# Print a starting header. 
+def print_start_header()
+  puts ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+end
+
+# Print an ending header. 
+def print_end_header()
+  puts "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+end
+
 # Define handy routine to run commands. 
 def run(command, abort_on_failure=false, verbose=false)
   if verbose
+    print_start_header
     puts "Executing command: #{command}"
+    print_end_header
   end
   success = system(command)
   if success
@@ -71,6 +83,8 @@ parser = OptionParser.new { |opts|
   opts.on('-p', '--password String', 'MySQL password') { 
     |v| options[:password] = v}
   opts.on('-s', '--schema String', 'Schema name') { |v| options[:schema] = v}
+  opts.on('-t', '--table String', 'Table within schema (default=all)') { 
+    |v| options[:table] = v}
   opts.on('-r', '--replicator String', 'Replicator home (/opt/continuent') { 
     |v| options[:replicator] = v}
   opts.on('-m', '--metadata String', 'Table metadata JSON file (/tmp/meta.json)') {
@@ -101,7 +115,7 @@ parser.parse!
 # Check arguments. 
 schema = options[:schema]
 if ! defined? schema
-  puts "Schema not defined"
+  puts "A schema is required to select tables"
   exit 1
 end 
 
@@ -119,17 +133,32 @@ end
 url = options[:url]
 user = options[:user]
 password = options[:password]
+verbose = options[:verbose]
+
+# Selection by table is optional, so prepare a possibly empty option for
+# ddlscan. 
+if options[:table]
+  table_opt = "-tables #{schema}.#{options[:table]}"
+else
+  table_opt = ""
+end
 
 # Load staging table definitions. 
 if options[:staging_ddl]
   puts "### Generating staging table definitions"
   run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-0.10-staging.vm \
-      -user #{user} -pass #{password} -url #{url} -db #{schema} \
+      -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
       > /tmp/staging.sql", 
-    true);
+    true, verbose);
+  if verbose
+    print_start_header
+    puts "### Staging table SQL:"
+    system("cat /tmp/staging.sql")
+    print_end_header
+  end
 
   puts "### Loading staging table DDL"
-  run("hive -f /tmp/staging.sql", true)
+  run("hive -f /tmp/staging.sql", true, verbose)
 else
   puts "### Staging DDL Skipped"
 end
@@ -138,11 +167,17 @@ end
 if options[:base_ddl]
   puts "### Generating and loading base table definitions"
   run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-0.10.vm \
-      -user #{user} -pass #{password} -url #{url} -db #{schema} \
+      -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
       > /tmp/base.sql", 
-    true);
+    verbose);
+  if verbose
+    print_start_header
+    puts "### Base  table SQL:"
+    system("cat /tmp/base.sql")
+    print_end_header
+  end
 
-  run("hive -f /tmp/base.sql", true)
+  run("hive -f /tmp/base.sql", verbose)
 else
   puts "### Base DDL Skipped"
 end
@@ -150,13 +185,19 @@ end
 # Generate metadata and run map/reduce. 
 if options[:map_reduce]
   puts "### Generating table metadata"
+  if verbose 
+    verbose_option = "--verbose"
+  else
+    verbose_option = ""
+  end
   run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-metadata.vm \
-      -user #{user} -pass #{password} -url #{url} -db #{schema} \
+      -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
       > #{options[:metadata]}", 
-    true);
+    true, verbose);
 
   puts "### Starting map/reduce"
-  run("#{home}/bin/materialize -m #{options[:metadata]}", true)
+  run("#{home}/bin/materialize -m #{options[:metadata]} #{verbose_option}", 
+    true, verbose)
 else
   puts "### Map/reduce skipped"
 end
@@ -175,13 +216,13 @@ if options[:compare]
        -password1 #{password} -url2 jdbc:hive2://localhost:10000 \
        -user2 'tungsten' -password2 'secret' -schema #{tab.schema} \
        -table #{tab.name} -verbose -keys #{tab.keys} \
-       -driver org.apache.hive.jdbc.HiveDriver >> #{options[:log]} 2>&1", false)
+       -driver org.apache.hive.jdbc.HiveDriver >> #{options[:log]} 2>&1", false, verbose)
 
     # Dump output if there is a failure. 
     if ok
-      puts "Compare succeeded"
+      puts "COMPARE SUCCEEDED"
     else
-      puts "Compare failed"
+      puts "COMPARE FAILED"
     end
   }
 else

@@ -16,7 +16,7 @@ then compare the results.  The steps are:
 1. Run map/reduce operation to generate a materialized view.  This invokes the materialize utility. 
 1. Compare data using Bristlecone dc command. 
 
-The inteface is shown below: 
+The interface is shown below: 
 
 	$ bin/load-reduce-check -h
 	Usage: load-reduce-check[.rb] [options]
@@ -24,6 +24,7 @@ The inteface is shown below:
 	    -u, --user String                MySQL user
 	    -p, --password String            MySQL password
 	    -s, --schema String              Schema name
+	    -t, --table String               Table within schema (default=all)
 	    -r, --replicator String          Replicator home (/opt/continuent
 	    -m, --metadata String            Table metadata JSON file (/tmp/meta.json)
 	    -v, --verbose                    Print verbose output
@@ -34,6 +35,17 @@ The inteface is shown below:
 	        --[no-]map-reduce            Load base table ddl
 	        --[no-]compare               Compare to source data 
 	    -h, --help                       Displays help
+
+Here is an example of running the full load-reduce-check process on all tables
+in a single schema db01.  
+
+	load-reduce-check -U jdbc:mysql:thin://logos1:3306/db01 -s db01
+
+The following example shows reduce with comparison only on a single table in the same schema. 
+	
+	load-reduce-check -U jdbc:mysql:thin://logos1:3306/db01 -s db01 -t sbtest --no-staging-ddl --no-base-ddl
+
+To see full output from the process, use the --verbose option.  Otherwise most output goes to log files load.out and materialize.out.  
 
 # materialize
 
