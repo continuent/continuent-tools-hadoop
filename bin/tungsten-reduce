@@ -28,6 +28,7 @@ use Getopt::Std;
 # Global variables. 
 undef my @currentKey;
 undef my $keyLength;
+undef my $key_col_index;
 undef my @currentRow;
 undef my $KEYS;
 undef my $COLUMNS;
@@ -46,7 +47,9 @@ sub printLog {
 sub output {
   my $last = $#currentRow;
   if ($currentRow[0] ne "D") {
-    print join("\t", @currentRow[3..$last]) . "\n";
+    my $output= join("\t", @currentRow[4..$last]) . "\n";
+    print $output;
+    printLog "EMIT: " . $output;
   }
 }
 
@@ -140,12 +143,12 @@ if ($VERBOSE > 0) {
   open LOG, ">/tmp/reduce.$$.out" or die "Unable to open log!!";
 }
 
-# Find keys in the columns. Note that the index starts at 3 because we 
+# Find keys in the columns. Note that the index starts at 4 because we 
 # we have preceding Tungsten columns. 
 $keyLength = 0;
 foreach my $key (split(',', $KEYS)) {
   # Find key within the column name list.
-  my $key_col_index = 0;
+  $key_col_index = 0;
   COL: foreach my $col (split(',', $COLUMNS)) {
     if ($col eq $key) {
       $KEY_NAMES{$key} = $key_col_index;
