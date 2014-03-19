@@ -94,7 +94,7 @@ parser = OptionParser.new { |opts|
   opts.on('-l', '--log String', 'Log file for detailed output') { |v|
     options[:log] = v}
   # Less common options just have long form. 
-  opts.on('--hive-ext-libs', 'Location of Hive JDBC jar files') {
+  opts.on('--hive-ext-libs String', 'Location of Hive JDBC jar files') {
     |v| options[:ext_libs] = v}
   opts.on('--[no-]staging-ddl', 'Load staging table ddl') {
     |v| options[:staging_ddl] = v}
