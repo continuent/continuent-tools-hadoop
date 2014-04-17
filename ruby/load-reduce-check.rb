@@ -120,7 +120,7 @@ parser = OptionParser.new { |opts|
     puts opts
     exit 0
   }
-  if options[:materialize] or options[:sqoop]
+  if options[:materialize] or options[:sqoop] or options[:compare]
     options[:genmetadata]
   end
 }
