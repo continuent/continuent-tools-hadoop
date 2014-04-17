@@ -69,10 +69,13 @@ options[:replicator] = "/opt/continuent"
 options[:metadata] = "/tmp/meta.json"
 options[:staging_ddl] = true
 options[:base_ddl] = true
-options[:map_reduce] = true
+options[:materialize] = true
+options[:genmetadata] = true
 options[:compare] = true
+options[:sqoop] = true
 options[:log] = "load.out"
 options[:ext_libs] = "/usr/lib/hive/lib"
+options[:sqoop_dir] = "/user/tungsten/sqoop"
 
 # Process options. 
 parser = OptionParser.new { |opts|
@@ -83,11 +86,13 @@ parser = OptionParser.new { |opts|
   opts.on('-p', '--password String', 'MySQL password') { 
     |v| options[:password] = v}
   opts.on('-s', '--schema String', 'Schema name') { |v| options[:schema] = v}
-  opts.on('-t', '--table String', 'Table within schema (default=all)') { 
+  opts.on('-t', '--table String', 'Table within schema (default=all)') {
     |v| options[:table] = v}
-  opts.on('-r', '--replicator String', 'Replicator home (/opt/continuent') { 
+  opts.on('-q', '--sqoop-dir String', "Directory within Hadoop for Sqooped table data (default=#{options[:sqoop_dir]})") { 
+    |v| options[:sqoop_dir] = v}
+  opts.on('-r', '--replicator String', "Replicator home (#{options[:replicator]})") { 
     |v| options[:replicator] = v}
-  opts.on('-m', '--metadata String', 'Table metadata JSON file (/tmp/meta.json)') {
+  opts.on('-m', '--metadata String', "Table metadata JSON file (#{options[:metadata]})") {
     |v| options[:metadata] = v}
   opts.on('-v', '--verbose', 'Print verbose output') { 
     options[:verbose] = true}
@@ -100,15 +105,24 @@ parser = OptionParser.new { |opts|
     |v| options[:staging_ddl] = v}
   opts.on('--[no-]base-ddl', 'Load base table ddl') {
     |v| options[:base_ddl] = v}
-  opts.on('--[no-]map-reduce', 'Load base table ddl') {
-    |v| options[:map_reduce] = v}
+  opts.on('--[no-]materialize', 'Materialize view for tables') {
+    |v| options[:materialize] = v}
+  opts.on('--[no-]map-reduce', 'Materialize view for tables (deprecated)') {
+    |v| options[:materialize] = v}
+  opts.on('--[no-]meta', 'Generate metadata for tables') {
+    |v| options[:genmetadata] = v}
   opts.on('--[no-]compare', 'Compare to source data') {
     |v| options[:compare] = v}
+  opts.on('--[no-]sqoop', 'Generate Sqoop commands to provision data') {
+    |v| options[:sqoop] = v}
   # Print help.
   opts.on('-h', '--help', 'Displays help') {
     puts opts
     exit 0
   }
+  if options[:materialize] or options[:sqoop]
+    options[:genmetadata]
+  end
 }
 parser.parse!
 
@@ -182,18 +196,43 @@ else
   puts "### Base DDL Skipped"
 end
 
+# Generate the metadata file
+if options[:genmetadata]
+  puts "### Generating table metadata"
+
+  run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-metadata.vm \
+      -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
+      > #{options[:metadata]}", 
+      true, verbose);
+end
+
+# Generate sqooop commands.
+if options[:sqoop]
+  puts "### Generating Sqoop Provision Commands"
+  tables = Table.array_from_metadata_file(options[:metadata])
+
+  tables.each { |tab|
+    File.open('/tmp/sqoop.sh','w') { |file| file.write("sqoop import --connect #{url} --username #{user} --password #{password} --table #{tab.name} --hive-import --hive-table #{tab.schema}.#{tab.name} --target-dir #{options[:sqoop_dir]}") }
+  }
+
+  if verbose
+    print_start_header
+    puts "### Sqoop Provisioning Commands"
+    system("cat /tmp/sqoop.sh")
+    print_end_header
+  end
+else
+   puts "### Sqoop Provision Commands Skipped"
+end
+
 # Generate metadata and run map/reduce. 
 if options[:map_reduce]
-  puts "### Generating table metadata"
+
   if verbose 
     verbose_option = "--verbose"
   else
     verbose_option = ""
   end
-  run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-metadata.vm \
-      -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
-      > #{options[:metadata]}", 
-    true, verbose);
 
   puts "### Starting map/reduce"
   run("#{home}/bin/materialize -m #{options[:metadata]} #{verbose_option}", 
