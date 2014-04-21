@@ -121,7 +121,7 @@ parser = OptionParser.new { |opts|
     exit 0
   }
   if options[:materialize] or options[:sqoop] or options[:compare]
-    options[:genmetadata]
+    options[:genmetadata] = true
   end
 }
 parser.parse!
@@ -226,7 +226,7 @@ else
 end
 
 # Generate metadata and run map/reduce. 
-if options[:map_reduce]
+if options[:materialize]
 
   if verbose 
     verbose_option = "--verbose"
