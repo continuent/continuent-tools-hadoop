@@ -14,7 +14,7 @@
 # under the License.
 #
 # Initial developer(s): Robert Hodges
-# Contributor(s): 
+# Contributor(s): MC Brown
 
 ###########################################################################
 # Script to generate and run map/reduce to generate materialized views 
@@ -95,10 +95,16 @@ tables.each { |tab|
   sql = <<EOT
 ADD FILE #{home}/bin/tungsten-reduce;
 FROM (  
+  SELECT 'I' as tungsten_opcode,0 as tungsten_seqno,#{tab.keys} as tungsten_row_id,0 as tungsten_commit_timestamp,sbx.*
+    FROM #{tab.fqn} sbx
+      DISTRIBUTE BY #{tab.keys}
+      SORT BY #{tab.keys},tungsten_opcode,tungsten_seqno,tungsten_row_id
+    UNION ALL
   SELECT sbx.*
     FROM #{tab.fqn("", "stage_xxx_")} sbx
-      DISTRIBUTE BY #{tab.keys} 
-      SORT BY #{tab.keys},tungsten_seqno,tungsten_row_id
+      DISTRIBUTE BY #{tab.keys}
+      SORT BY #{tab.keys},tungsten_opcode,tungsten_seqno,tungsten_row_id
+
 ) map1
 INSERT OVERWRITE TABLE #{tab.fqn}
   SELECT TRANSFORM(
@@ -106,7 +112,7 @@ INSERT OVERWRITE TABLE #{tab.fqn}
     USING 'perl tungsten-reduce -k #{tab.keys} -c tungsten_opcode,tungsten_seqno,tungsten_row_id,tungsten_commit_timestamp,#{tab.columns}'
     AS #{tab.columns_with_types};
 EOT
-  # Print if we are verbose. 
+  # Print if we are verbose.
   if verbose
     print_start_header
     puts "### Map/Reduce Query:"
@@ -114,10 +120,10 @@ EOT
     print_end_header
   end
 
-  # Echo the query to the log. 
+  # Echo the query to the log.
   File.open(options[:log], "a") {|f| f.write(sql) }
 
-  # Write query to file. 
+  # Write query to file.
   File.open("/tmp/hive.sql", "w") {|f| f.write(sql) }
   success = system("hive -f /tmp/hive.sql >> #{options[:log]} 2>&1")
   if success

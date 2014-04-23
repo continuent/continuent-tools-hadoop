@@ -14,7 +14,7 @@
 # under the License.
 #
 # Initial developer(s): Robert Hodges
-# Contributor(s): 
+# Contributor(s): MC Brown
 
 ###########################################################################
 # Script to define Hive staging and base tables, run map/reduce script
@@ -62,7 +62,7 @@ home = ENV["THOME"]
 
 # Set option defaults. 
 options = {}
-options[:url] = "jdbc:mysql:thin://local:3306"
+options[:url] = "jdbc:mysql:thin://localhost:3306"
 options[:user] = "tungsten"
 options[:password] = "secret"
 options[:replicator] = "/opt/continuent"
