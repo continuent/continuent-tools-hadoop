@@ -6,6 +6,19 @@ replicated into Hadoop. This project works in conjunction
 with Tungsten Replicator 3.0, which supports replication to HDFS
 (https://code.google.com/p/tungsten-replicator).
 
+# Prerequisites
+
+You will need to install ruby, rubygems, and the Json ruby library. 
+
+	sudo apt-get install ruby
+	sudo apt-get install rubygems
+	sudo gem install json
+
+In addition you must create any Hive databases that will receive table data
+from Tungsten Replicator.  Here's a typical create database command: 
+
+	hive> create databases foo;
+
 # load-reduce-check
 
 Implements the process to convert staging data to a materialized view, 
