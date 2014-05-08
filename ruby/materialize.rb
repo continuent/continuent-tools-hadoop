@@ -94,24 +94,25 @@ tables.each { |tab|
   puts "# Executing map/reduce: #{tab.to_s}"
   sql = <<EOT
 ADD FILE #{home}/bin/tungsten-reduce;
-FROM (  
-  SELECT 'I' as tungsten_opcode,0 as tungsten_seqno,#{tab.keys} as tungsten_row_id,0 as tungsten_commit_timestamp,sbx.*
-    FROM #{tab.fqn} sbx
-      DISTRIBUTE BY #{tab.keys}
-      SORT BY #{tab.keys},tungsten_opcode,tungsten_seqno,tungsten_row_id
+FROM (
+  SELECT * FROM
+  (  
+    SELECT 'I' as tungsten_opcode,0 as tungsten_seqno,0 as tungsten_row_id,0 as tungsten_commit_timestamp,sbx.*
+      FROM #{tab.fqn} sbx
     UNION ALL
-  SELECT sbx.*
-    FROM #{tab.fqn("", "stage_xxx_")} sbx
-      DISTRIBUTE BY #{tab.keys}
-      SORT BY #{tab.keys},tungsten_opcode,tungsten_seqno,tungsten_row_id
-
-) map1
+    SELECT sbx.*
+      FROM #{tab.fqn("", "stage_xxx_")} sbx
+  ) map1
+  DISTRIBUTE BY #{tab.keys}
+  SORT BY #{tab.keys},tungsten_seqno,tungsten_row_id
+) sorted1
 INSERT OVERWRITE TABLE #{tab.fqn}
   SELECT TRANSFORM(
       tungsten_opcode,tungsten_seqno,tungsten_row_id,tungsten_commit_timestamp,#{tab.columns()})
     USING 'perl tungsten-reduce -k #{tab.keys} -c tungsten_opcode,tungsten_seqno,tungsten_row_id,tungsten_commit_timestamp,#{tab.columns}'
     AS #{tab.columns_with_types};
 EOT
+
   # Print if we are verbose.
   if verbose
     print_start_header

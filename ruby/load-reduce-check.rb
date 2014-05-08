@@ -65,6 +65,7 @@ options = {}
 options[:url] = "jdbc:mysql:thin://localhost:3306"
 options[:user] = "tungsten"
 options[:password] = "secret"
+options[:service] = nil
 options[:replicator] = "/opt/continuent"
 options[:metadata] = "/tmp/meta.json"
 options[:staging_ddl] = true
@@ -76,45 +77,54 @@ options[:sqoop] = true
 options[:log] = "load.out"
 options[:ext_libs] = "/usr/lib/hive/lib"
 options[:sqoop_dir] = "/user/tungsten/sqoop"
+options[:staging_dir] = "/user/tungsten/staging"
+options[:schema_prefix] = nil
+
 
 # Process options. 
 parser = OptionParser.new { |opts|
   opts.banner = "Usage: load-reduce-check[.rb] [options]"
   # Most common options have short and long forms. 
-  opts.on('-U', '--url String', 'MySQL DBMS JDBC url') { |v| options[:url] = v}
-  opts.on('-u', '--user String', 'MySQL user') { |v| options[:user] = v}
+  opts.on('-D', '--staging-dir String', "Directory within Hadoop for staging data (default=#{options[:staging_dir]})") { 
+    |v| options[:staging_dir] = v}
+  opts.on('-l', '--log String', 'Log file for detailed output') { |v|
+    options[:log] = v}
+  opts.on('-m', '--metadata String', "Table metadata JSON file (#{options[:metadata]})") {
+    |v| options[:metadata] = v}
+  opts.on('-P', '--schema-prefix String', 'Prefix for schema names (defaults to replication service') { 
+    |v| options[:schema_prefix] = v}
   opts.on('-p', '--password String', 'MySQL password') { 
     |v| options[:password] = v}
-  opts.on('-s', '--schema String', 'Schema name') { |v| options[:schema] = v}
-  opts.on('-t', '--table String', 'Table within schema (default=all)') {
-    |v| options[:table] = v}
   opts.on('-q', '--sqoop-dir String', "Directory within Hadoop for Sqooped table data (default=#{options[:sqoop_dir]})") { 
     |v| options[:sqoop_dir] = v}
   opts.on('-r', '--replicator String', "Replicator home (#{options[:replicator]})") { 
     |v| options[:replicator] = v}
-  opts.on('-m', '--metadata String', "Table metadata JSON file (#{options[:metadata]})") {
-    |v| options[:metadata] = v}
+  opts.on('-S', '--service String', 'Replicator service that generated data') { 
+    |v| options[:service] = v}
+  opts.on('-s', '--schema String', 'DBMS schema') { |v| options[:schema] = v}
+  opts.on('-t', '--table String', 'Table within schema (default=all)') {
+    |v| options[:table] = v}
+  opts.on('-U', '--url String', 'MySQL DBMS JDBC url') { |v| options[:url] = v}
+  opts.on('-u', '--user String', 'MySQL user') { |v| options[:user] = v}
   opts.on('-v', '--verbose', 'Print verbose output') { 
     options[:verbose] = true}
-  opts.on('-l', '--log String', 'Log file for detailed output') { |v|
-    options[:log] = v}
   # Less common options just have long form. 
   opts.on('--hive-ext-libs String', 'Location of Hive JDBC jar files') {
     |v| options[:ext_libs] = v}
-  opts.on('--[no-]staging-ddl', 'Load staging table ddl') {
-    |v| options[:staging_ddl] = v}
   opts.on('--[no-]base-ddl', 'Load base table ddl') {
     |v| options[:base_ddl] = v}
-  opts.on('--[no-]materialize', 'Materialize view for tables') {
-    |v| options[:materialize] = v}
+  opts.on('--[no-]compare', 'Compare to source data') {
+    |v| options[:compare] = v}
   opts.on('--[no-]map-reduce', 'Materialize view for tables (deprecated)') {
+    |v| options[:materialize] = v}
+  opts.on('--[no-]materialize', 'Materialize view for tables') {
     |v| options[:materialize] = v}
   opts.on('--[no-]meta', 'Generate metadata for tables') {
     |v| options[:genmetadata] = v}
-  opts.on('--[no-]compare', 'Compare to source data') {
-    |v| options[:compare] = v}
   opts.on('--[no-]sqoop', 'Generate Sqoop commands to provision data') {
     |v| options[:sqoop] = v}
+  opts.on('--[no-]staging-ddl', 'Load staging table ddl') {
+    |v| options[:staging_ddl] = v}
   # Print help.
   opts.on('-h', '--help', 'Displays help') {
     puts opts
@@ -157,12 +167,34 @@ else
   table_opt = ""
 end
 
+# If we have a service name use it to form the staging location. 
+service = options[:service]
+if service == nil
+  staging_root_dir = options[:staging_dir]
+else
+  staging_root_dir = options[:staging_dir] + "/" + service
+end 
+
+# If we have a schema prefix note that, otherwise default to the 
+# service.  If we have a value, compute a schema prefix. 
+schema_prefix = options[:schema_prefix]
+if schema_prefix == nil && service != nil
+  schema_prefix = service + "_"
+end
+if schema_prefix != nil
+  schema_prefix_option = "-opt schemaPrefix #{schema_prefix}"
+else
+  schema_prefix_option = ""
+end
+
 # Load staging table definitions. 
 if options[:staging_ddl]
   puts "### Generating staging table definitions"
+
   run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-0.10-staging.vm \
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
-      > /tmp/staging.sql", 
+      -opt hdfsStagingDir #{staging_root_dir} #{schema_prefix_option} \
+      > /tmp/staging.sql", \
     true, verbose);
   if verbose
     print_start_header
@@ -182,7 +214,7 @@ if options[:base_ddl]
   puts "### Generating and loading base table definitions"
   run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-0.10.vm \
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
-      > /tmp/base.sql", 
+      #{schema_prefix_option} > /tmp/base.sql", 
     verbose);
   if verbose
     print_start_header
@@ -202,7 +234,7 @@ if options[:genmetadata]
 
   run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-metadata.vm \
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
-      > #{options[:metadata]}", 
+      #{schema_prefix_option} > #{options[:metadata]}", 
       true, verbose);
 end
 
@@ -227,7 +259,6 @@ end
 
 # Generate metadata and run map/reduce. 
 if options[:materialize]
-
   if verbose 
     verbose_option = "--verbose"
   else
@@ -252,8 +283,9 @@ if options[:compare]
     puts "### Comparing table: #{tab.to_s}"
     ENV["TUNGSTEN_EXT_LIBS"] = options[:ext_libs]
     ok = run("#{bristlecone_bin}/dc -url1 #{url} -user1 #{user} \
-       -password1 #{password} -url2 jdbc:hive2://localhost:10000 \
-       -user2 'tungsten' -password2 'secret' -schema #{tab.schema} \
+       -password1 #{password} -url2 jdbc:hive2://localhost:10000/#{tab.schema} \
+       -user2 'tungsten' -password2 'secret' \
+       -schema1 #{schema} -schema2 #{tab.schema} \
        -table #{tab.name} -verbose -keys #{tab.keys} \
        -driver org.apache.hive.jdbc.HiveDriver >> #{options[:log]} 2>&1", false, verbose)
 
