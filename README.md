@@ -63,7 +63,7 @@ following:
 Now you can run the load-reduce-check program to populate data into your view. 
 
     cd git/continuent-tools-hadoop
-    bin/load-reduce-check -U jdbc:mysql:thin://logos1:3306/db01 -s db01 -U tungsten -p secret --service=mysql1
+    bin/load-reduce-check -U jdbc:mysql:thin://logos1:3306/db01 -s db01 -u tungsten -p secret --service=mysql1
 
 If you want to see exactly what is happening, add the --verbose option. 
 
