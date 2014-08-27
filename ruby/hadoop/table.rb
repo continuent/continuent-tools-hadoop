@@ -51,6 +51,14 @@ class Table
     tables
   end
 
+  def valid?
+    if defined? @keys
+      puts "Validation failed: Keys or columns not defined"
+      return false
+    end
+    return true
+  end
+
   # Return fully-qualified table name. 
   def fqn(schema_prefix="", name_prefix="")
     "#{schema_prefix}#{@schema}.#{name_prefix}#{@name}"

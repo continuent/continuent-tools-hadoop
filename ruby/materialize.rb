@@ -90,6 +90,10 @@ tables = Table.array_from_metadata_file(metadata_file)
 
 # Generate and run map/reduce query for each tables. 
 tables.each { |tab|
+  if !(tab.valid?)
+    puts "Skipping due to errors in table #{tab.schema}.#{tab.name}"
+    next
+  end
   # Print header and generate query. 
   puts "# Executing map/reduce: #{tab.to_s}"
   sql = <<EOT
