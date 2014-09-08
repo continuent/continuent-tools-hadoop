@@ -162,7 +162,7 @@ verbose = options[:verbose]
 # Selection by table is optional, so prepare a possibly empty option for
 # ddlscan. 
 if options[:table]
-  table_opt = "-tables #{schema}.#{options[:table]}"
+  table_opt = "-tables #{options[:table]}"
 else
   table_opt = ""
 end
