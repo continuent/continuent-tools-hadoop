@@ -79,7 +79,8 @@ options[:ext_libs] = "/usr/lib/hadoop:/usr/lib/hive/lib:/usr/lib/hadoop-mapreduc
 options[:sqoop_dir] = "/user/tungsten/sqoop"
 options[:staging_dir] = "/user/tungsten/staging"
 options[:schema_prefix] = nil
-
+options[:hivecmd] = 'hive'
+options[:beelineurl] = 'jdbc:hive2://localhost:10000'
 
 # Process options. 
 parser = OptionParser.new { |opts|
@@ -101,6 +102,10 @@ parser = OptionParser.new { |opts|
     |v| options[:replicator] = v}
   opts.on('-S', '--service String', 'Replicator service that generated data') { 
     |v| options[:service] = v}
+  opts.on('--hivecmd String', 'Hive command interface to use (default: hive)') { 
+    |v| options[:hivecmd] = v}
+  opts.on('--beelineurl String', 'Beeline URL (default:  #{options[:beelineurl]})') { 
+    |v| options[:beelineurl] = v}
   opts.on('-s', '--schema String', 'DBMS schema') { |v| options[:schema] = v}
   opts.on('-t', '--table String', 'Table within schema (default=all)') {
     |v| options[:table] = v}
@@ -148,11 +153,18 @@ if ! File.directory?(replicator_bin)
   puts "Replicator bin directory does not exist: " + replicator_bin
   exit 1
 end 
+
 bristlecone_bin = options[:replicator] + "/tungsten/bristlecone/bin"
-if ! File.directory?(bristlecone_bin)
-  puts "Bristlecone bin directory does not exist: " + bristlecone_bin
-  exit 1
+if options[:compare]
+  if ! File.directory?(bristlecone_bin)
+    puts "Bristlecone bin directory does not exist: " + bristlecone_bin
+    exit 1
+  end
 end 
+
+if options[:hivecmd] == 'beeline'
+  options[:hivecmd] = "#{options[:hivecmd]} -u #{options[:beelineurl]}"
+end
 
 url = options[:url]
 user = options[:user]
@@ -204,7 +216,7 @@ if options[:staging_ddl]
   end
 
   puts "### Loading staging table DDL"
-  run("hive -f /tmp/staging.sql", true, verbose)
+  run("#{options[:hivecmd]} -f /tmp/staging.sql", true, verbose)
 else
   puts "### Staging DDL Skipped"
 end
@@ -223,7 +235,7 @@ if options[:base_ddl]
     print_end_header
   end
 
-  run("hive -f /tmp/base.sql", verbose)
+  run("#{options[:hivecmd]} -f /tmp/base.sql", verbose)
 else
   puts "### Base DDL Skipped"
 end

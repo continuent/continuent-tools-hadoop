@@ -47,6 +47,8 @@ options[:schema] = ".*"
 options[:metadata] = "meta.json"
 options[:staging_prefix] = "stage_xxx_"
 options[:log] = "materialize.out"
+options[:hivecmd] = 'hive'
+options[:beelineurl] = 'jdbc:hive2://localhost:10000'
 
 # Process options. 
 parser = OptionParser.new { |opts|
@@ -58,6 +60,10 @@ parser = OptionParser.new { |opts|
     |v| options[:refresh] = v}
   opts.on('-s', '--schema String', 'Schema name') { |v| options[:schema] = v}
   opts.on('-t', '--table String', 'Table name') { |v| options[:table] = v}
+  opts.on('--hivecmd String', 'Hive command interface to use (default: hive)') { 
+    |v| options[:hivecmd] = v}
+  opts.on('--beelineurl String', 'Beeline URL (default: #{options[:beelineurl]})') { 
+    |v| options[:beelineurl] = v}
   opts.on('-v', '--verbose', 'Print verbose output') { 
     options[:verbose] = true}
   opts.on('-l', '--log String', 'Log file for detailed output') { |v|
@@ -82,6 +88,10 @@ elseif ! File.readable?(metadata_file)
   puts "Metadata file not readable: " + metadata_file
   exit 1
 end 
+
+if options[:hivecmd] == 'beeline'
+  options[:hivecmd] = "#{options[:hivecmd]} -u #{options[:beelineurl]}"
+end
 
 verbose = options[:verbose] 
 
@@ -126,7 +136,7 @@ EOT
 
   # Write query to file.
   File.open("/tmp/hive.sql", "w") {|f| f.write(sql) }
-  success = system("hive -f /tmp/hive.sql >> #{options[:log]} 2>&1")
+  success = system("#{options[:hivecmd]} -f /tmp/hive.sql >> #{options[:log]} 2>&1")
   if success
     puts "OK"
   else
