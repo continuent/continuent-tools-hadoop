@@ -67,6 +67,7 @@ options[:user] = "tungsten"
 options[:hiveuser] = "tungsten"
 options[:password] = "secret"
 options[:service] = nil
+options[:srcdbtype] = "mysql"
 options[:replicator] = "/opt/continuent"
 options[:metadata] = "/tmp/meta.json"
 options[:staging_ddl] = true
@@ -109,6 +110,8 @@ parser = OptionParser.new { |opts|
     |v| options[:beelineurl] = v}
   opts.on('--hiveuser String', 'Replication user URL (default: #{options[:hiveuser]})') { 
     |v| options[:hiveuser] = v}
+  opts.on('--srcdbtype String', 'Source database type (default: #{options[:srcdbtype]})') { 
+    |v| options[:srcdbtype] = v}
   opts.on('-s', '--schema String', 'DBMS schema') { |v| options[:schema] = v}
   opts.on('-t', '--table String', 'Table within schema (default=all)') {
     |v| options[:table] = v}
@@ -210,7 +213,7 @@ end
 if options[:staging_ddl]
   puts "### Generating staging table definitions"
 
-  run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-0.10-staging.vm \
+  run("#{replicator_bin}/ddlscan -template ddl-#{options[:srcdbtype]}-hive-0.10-staging.vm \
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
       -opt servicePrefix #{options[:service]} \
       -opt username #{options[:user]} \
@@ -233,7 +236,7 @@ end
 # Load base table definitions. 
 if options[:base_ddl]
   puts "### Generating and loading base table definitions"
-  run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-0.10.vm \
+  run("#{replicator_bin}/ddlscan -template ddl-#{options[:srcdbtype]}-hive-0.10.vm \
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
       #{schema_prefix_option} > /tmp/base.sql", 
     verbose);
@@ -253,7 +256,7 @@ end
 if options[:genmetadata]
   puts "### Generating table metadata"
 
-  run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-metadata.vm \
+  run("#{replicator_bin}/ddlscan -template ddl-#{options[:srcdbtype]}-hive-metadata.vm \
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
       #{schema_prefix_option} > #{options[:metadata]}", 
       true, verbose);
