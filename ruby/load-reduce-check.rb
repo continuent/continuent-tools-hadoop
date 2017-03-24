@@ -64,6 +64,7 @@ home = ENV["THOME"]
 options = {}
 options[:url] = "jdbc:mysql:thin://localhost:3306"
 options[:user] = "tungsten"
+options[:hiveuser] = "tungsten"
 options[:password] = "secret"
 options[:service] = nil
 options[:replicator] = "/opt/continuent"
@@ -76,8 +77,8 @@ options[:compare] = true
 options[:sqoop] = true
 options[:log] = "load.out"
 options[:ext_libs] = "/usr/lib/hadoop:/usr/lib/hive/lib:/usr/lib/hadoop-mapreduce:/usr/lib/hadoop/client"
-options[:sqoop_dir] = "/user/tungsten/sqoop"
-options[:staging_dir] = "/user/tungsten/staging"
+options[:sqoop_dir] = "/user/#{options[:hiveuser]}/sqoop"
+options[:staging_dir] = "/user/#{options[:hiveuser]}/staging"
 options[:schema_prefix] = nil
 options[:hivecmd] = 'hive'
 options[:beelineurl] = 'jdbc:hive2://localhost:10000'
@@ -94,7 +95,7 @@ parser = OptionParser.new { |opts|
     |v| options[:metadata] = v}
   opts.on('-P', '--schema-prefix String', 'Prefix for schema names (defaults to replication service') { 
     |v| options[:schema_prefix] = v}
-  opts.on('-p', '--password String', 'MySQL password') { 
+  opts.on('-p', '--password String', 'Source database password') { 
     |v| options[:password] = v}
   opts.on('-q', '--sqoop-dir String', "Directory within Hadoop for Sqooped table data (default=#{options[:sqoop_dir]})") { 
     |v| options[:sqoop_dir] = v}
@@ -104,13 +105,15 @@ parser = OptionParser.new { |opts|
     |v| options[:service] = v}
   opts.on('--hivecmd String', 'Hive command interface to use (default: hive)') { 
     |v| options[:hivecmd] = v}
-  opts.on('--beelineurl String', 'Beeline URL (default:  #{options[:beelineurl]})') { 
+  opts.on('--beelineurl String', 'Beeline URL (default: #{options[:beelineurl]})') { 
     |v| options[:beelineurl] = v}
+  opts.on('--hiveuser String', 'Replication user URL (default: #{options[:hiveuser]})') { 
+    |v| options[:hiveuser] = v}
   opts.on('-s', '--schema String', 'DBMS schema') { |v| options[:schema] = v}
   opts.on('-t', '--table String', 'Table within schema (default=all)') {
     |v| options[:table] = v}
-  opts.on('-U', '--url String', 'MySQL DBMS JDBC url') { |v| options[:url] = v}
-  opts.on('-u', '--user String', 'MySQL user') { |v| options[:user] = v}
+  opts.on('-U', '--url String', 'Source database DBMS JDBC url') { |v| options[:url] = v}
+  opts.on('-u', '--user String', 'Source database user') { |v| options[:user] = v}
   opts.on('-v', '--verbose', 'Print verbose output') { 
     options[:verbose] = true}
   # Less common options just have long form. 
@@ -140,6 +143,10 @@ parser = OptionParser.new { |opts|
   end
 }
 parser.parse!
+
+if options[:hiveuser] != 'tungsten'
+  options[:staging_dir] = "/user/#{options[:hiveuser]}/staging"
+end
 
 # Check arguments. 
 schema = options[:schema]
@@ -205,6 +212,8 @@ if options[:staging_ddl]
 
   run("#{replicator_bin}/ddlscan -template ddl-mysql-hive-0.10-staging.vm \
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
+      -opt servicePrefix #{options[:service]} \
+      -opt username #{options[:user]} \
       -opt hdfsStagingDir #{staging_root_dir} #{schema_prefix_option} \
       > /tmp/staging.sql", \
     true, verbose);
