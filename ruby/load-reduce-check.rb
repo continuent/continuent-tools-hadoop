@@ -202,13 +202,14 @@ end
 # If we have a schema prefix note that, otherwise default to the 
 # service.  If we have a value, compute a schema prefix. 
 schema_prefix = options[:schema_prefix]
-if schema_prefix == nil && service != nil
+if schema_prefix.nil? && service.nil?
   schema_prefix = service + "_"
 end
-if schema_prefix != nil
-  schema_prefix_option = "-opt schemaPrefix #{schema_prefix}"
-else
+
+if schema_prefix.nil?
   schema_prefix_option = ""
+else
+  schema_prefix_option = "-opt schemaPrefix #{schema_prefix}"
 end
 
 # Load staging table definitions. 
