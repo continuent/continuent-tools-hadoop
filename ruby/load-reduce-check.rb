@@ -220,7 +220,7 @@ if options[:staging_ddl]
       -opt servicePrefix #{options[:service]} \
       -opt username #{options[:targetuser]} \
       -opt hdfsStagingDir #{staging_root_dir} \
-      -opt schemaPrefix #{schema_prefix_option} \
+      #{schema_prefix_option} \
       > /tmp/staging.sql", \
     true, verbose);
   if verbose
