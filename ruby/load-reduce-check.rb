@@ -219,7 +219,6 @@ if options[:staging_ddl]
   run("#{replicator_bin}/ddlscan -template ddl-#{options[:srcdbtype]}-hive-0.10-staging.vm \
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
       -opt servicePrefix #{options[:service]} \
-      -opt username #{options[:targetuser]} \
       -opt hdfsStagingDir #{staging_root_dir} \
       #{schema_prefix_option} \
       > /tmp/staging.sql", \
