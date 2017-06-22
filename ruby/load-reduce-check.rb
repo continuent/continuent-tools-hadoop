@@ -74,7 +74,7 @@ options[:staging_ddl] = true
 options[:base_ddl] = true
 options[:materialize] = true
 options[:genmetadata] = true
-options[:compare] = true
+options[:compare] = false
 options[:sqoop] = true
 options[:log] = "load.out"
 options[:ext_libs] = "/usr/lib/hadoop:/usr/lib/hive/lib:/usr/lib/hadoop-mapreduce:/usr/lib/hadoop/client"
@@ -217,7 +217,8 @@ if options[:staging_ddl]
       -user #{user} -pass #{password} -url #{url} -db #{schema} #{table_opt} \
       -opt servicePrefix #{options[:service]} \
       -opt username #{options[:user]} \
-      -opt hdfsStagingDir #{staging_root_dir} #{schema_prefix_option} \
+      -opt hdfsStagingDir #{staging_root_dir} \
+      -opt schemaPrefix #{schema_prefix_option} \
       > /tmp/staging.sql", \
     true, verbose);
   if verbose
