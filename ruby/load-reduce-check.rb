@@ -114,7 +114,7 @@ parser = OptionParser.new { |opts|
   opts.on('--srcdbtype String', 'Source database type (default: #{options[:srcdbtype]})') { 
     |v| options[:srcdbtype] = v}
   opts.on('-s', '--schema String', 'DBMS schema') { |v| options[:schema] = v}
-  opts.on('-t', '--table String', 'Table within schema (default=all)') {
+  opts.on('-t', '--table String', 'Table (comma-separated list) within specified schema (default=all)') {
     |v| options[:table] = v}
   opts.on('-U', '--url String', 'Source database DBMS JDBC url') { |v| options[:url] = v}
   opts.on('-u', '--user String', 'Source database user') { |v| options[:user] = v}
@@ -193,7 +193,7 @@ end
 
 # If we have a service name use it to form the staging location. 
 service = options[:service]
-if service == nil
+if service.nil?
   staging_root_dir = options[:staging_dir]
 else
   staging_root_dir = options[:staging_dir] + "/" + service
@@ -202,7 +202,7 @@ end
 # If we have a schema prefix note that, otherwise default to the 
 # service.  If we have a value, compute a schema prefix. 
 schema_prefix = options[:schema_prefix]
-if schema_prefix.nil? && service.nil?
+if schema_prefix.nil? && !service.nil?
   schema_prefix = service + "_"
 end
 
