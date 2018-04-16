@@ -107,7 +107,7 @@ ADD FILE #{home}/bin/tungsten-reduce;
 FROM (
   SELECT * FROM
   (  
-    SELECT 'I' as tungsten_opcode,0 as tungsten_seqno,0 as tungsten_row_id,0 as tungsten_commit_timestamp,sbx.*
+    SELECT 'I' as tungsten_opcode,0 as tungsten_seqno,0 as tungsten_row_id,cast("0001-01-01 01:01:01" as timestamp) as tungsten_commit_timestamp,sbx.*
       FROM #{tab.fqn} sbx
     UNION ALL
     SELECT sbx.*
